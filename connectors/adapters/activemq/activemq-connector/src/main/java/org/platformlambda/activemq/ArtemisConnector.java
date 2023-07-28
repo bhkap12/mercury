@@ -61,6 +61,7 @@ public class ArtemisConnector implements CloudSetup {
 
     private static final ConcurrentMap<String, Connection> allConnections = new ConcurrentHashMap<>();
     private static final ConcurrentMap<String, Properties> allProperties = new ConcurrentHashMap<>();
+    public static final int TIMEOUT_MS = 10000;
 
     public static Properties getClusterProperties(String location) {
         // default location is cloud.client.properties
@@ -90,7 +91,7 @@ public class ArtemisConnector implements CloudSetup {
                     int port = util.str2int(address.substring(colon + 1));
                     if (port > 0) {
                         // ping the address to confirm it is reachable before making a client connection
-                        if (util.portReady(host, port, 10000)) {
+                        if (util.portReady(host, port, TIMEOUT_MS)) { //refactored magic number - Bhavya Kapoor CSCI 3130
                             reachable = true;
                         }
                     }
@@ -116,7 +117,8 @@ public class ArtemisConnector implements CloudSetup {
             connection.setExceptionListener((e) -> {
                 String error = e.getMessage();
                 log.error("Activemq cluster exception - {}", error);
-                if (error != null && (error.contains("terminated") || error.contains("disconnect"))) {
+                boolean terminatedOrDisconnected = error != null && (error.contains("terminated") || error.contains("disconnect"));
+                if (terminatedOrDisconnected) { //refactored complex conditional - Bhavya Kapoor
                     ArtemisConnector.stopConnection(domain);
                     System.exit(10);
                 }

@@ -59,23 +59,23 @@ public class EventConsumer {
     private final String domain;
     private final Properties properties;
 
-    public EventConsumer(String domain, Properties properties, String topic, int partition, String... parameters)
+    public EventConsumer(eventConsumerDetails eventConsumerDetails) //refactored long parameters
             throws IOException {
-        this.domain = domain;
-        this.properties = properties;
+        this.domain = eventConsumerDetails.getDomain();
+        this.properties = eventConsumerDetails.getProperties();
         boolean substitute = ConnectorConfig.topicSubstitutionEnabled();
         Map<String, String> preAllocatedTopics = ConnectorConfig.getTopicSubstitution();
-        this.topic = topic;
-        this.partition = partition;
-        this.virtualTopic = partition < 0 ? topic : topic + "." + partition;
+        this.topic = eventConsumerDetails.getTopic();
+        this.partition = eventConsumerDetails.getPartition();
+        this.virtualTopic = eventConsumerDetails.getPartition() < 0 ? eventConsumerDetails.getTopic() : eventConsumerDetails.getTopic() + "." + eventConsumerDetails.getPartition();
         this.realTopic = substitute? preAllocatedTopics.getOrDefault(virtualTopic, virtualTopic) : virtualTopic;
         Utility util = Utility.getInstance();
         /*
          * Ignore groupId and clientId as they are specific to Kafka only.
          * Just detect if INITIALIZE is provided.
          */
-        if (parameters != null) {
-            for (String p: parameters) {
+        if (eventConsumerDetails.getParameters() != null) {
+            for (String p: eventConsumerDetails.getParameters()) {
                 long offset = util.str2long(p);
                 if (offset == INITIALIZE) {
                     this.offset = INITIALIZE;

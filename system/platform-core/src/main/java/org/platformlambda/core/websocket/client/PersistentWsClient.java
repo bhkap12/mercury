@@ -102,58 +102,77 @@ public class PersistentWsClient extends Thread {
         log.info("Started - {}, idle timeout = {} seconds", urls, idleSeconds);
         makeConnection(idleSeconds);
     }
-
-    private void makeConnection(int idleSeconds) {
+    private boolean isConnectionNotPossible() { // created new method
         if (!running) {
-            return;
+            return true;
         }
         if (urls.isEmpty()) {
             log.error("No valid target URLs are available");
-            return;
+            return true;
         }
         if (connected.get()) {
             log.error("Session is still connected");
+            return true;
+        }
+        return false;
+    }
+
+    private WebSocketConnectOptions prepareWebSocketOptions(String url, int idleSeconds) { // second new method
+        final boolean secure;
+        if (url.startsWith("ws://")) {
+            secure = false;
+            url = url.replace("ws://", "http://");
+        } else if (url.startsWith("wss://")) {
+            secure = true;
+            url = url.replace("wss://", "https://");
+        } else {
+            log.error("Invalid target URL {} - protocol must be ws:// or wss://", url);
+            urls.remove(url);
+            vertx.setTimer(RETRY_TIMER, n -> makeConnection(idleSeconds));
+            return null;
+        }
+
+        final Platform platform = Platform.getInstance();
+        final WebSocketConnectOptions options;
+        final URI target;
+        try {
+            int defaultPort = secure ? 443 : 80;
+            target = new URI(url);
+            options = new WebSocketConnectOptions()
+                    .setHost(target.getHost())
+                    .setPort(target.getPort() > 0 ? target.getPort() : defaultPort)
+                    .setURI(target.getPath() + "/" + platform.getOrigin())
+                    .setSsl(secure)
+                    .setTimeout(idleSeconds * 1000L);
+        } catch (URISyntaxException e) {
+            log.error("Invalid target URL {} - {}", url, e.getMessage());
+            urls.remove(url);
+            vertx.setTimer(RETRY_TIMER, n -> makeConnection(idleSeconds));
+            return null;
+        }
+
+        return options;
+    }
+
+
+
+    private void makeConnection(int idleSeconds) { //making this long method shorter
+        if (isConnectionNotPossible()) {
             return;
         }
+
         // get next URL using a round-robin
         if (targets.isEmpty()) {
             targets.addAll(urls);
         }
         String u = targets.get(0);
         targets.remove(0);
-        final boolean secure;
-        final String url;
-        if (u.startsWith("ws://")) {
-            secure = false;
-            url = u.replace("ws://", "http://");
-        } else if (u.startsWith("wss://")) {
-            secure = true;
-            url = u.replace("wss://", "https://");
-        } else {
-            log.error("Invalid target URL {} - protocol must be ws:// or wss://", u);
-            urls.remove(u);
-            vertx.setTimer(RETRY_TIMER, n -> makeConnection(idleSeconds));
-            return;
-        }
+        final String url = null;
+        WebSocketConnectOptions options = prepareWebSocketOptions(url,idleSeconds);
         final Platform platform = Platform.getInstance();
         final EventEmitter po = EventEmitter.getInstance();
-        final WebSocketConnectOptions options;
-        final URI target;
-        try {
-            int defaultPort = secure? 443 : 80;
-            target = new URI(url);
-            options = new WebSocketConnectOptions();
-            options.setHost(target.getHost());
-            options.setPort(target.getPort() > 0? target.getPort() : defaultPort);
-            options.setURI(target.getPath() + "/" + platform.getOrigin());
-            options.setSsl(secure);
-            options.setTimeout(idleSeconds * 1000L);
-        } catch (URISyntaxException e) {
-            log.error("Invalid target URL {} - {}", u, e.getMessage());
-            urls.remove(0);
-            vertx.setTimer(RETRY_TIMER, n -> makeConnection(idleSeconds));
-            return;
-        }
+        final URI target = null;
+        
         String txPath = PC+sessionId+"."+seq.get()+OUT;
         Future<WebSocket> connection = client.webSocket(options);
         connection.onSuccess(ws -> {

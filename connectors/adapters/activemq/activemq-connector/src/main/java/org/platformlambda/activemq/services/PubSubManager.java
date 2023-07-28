@@ -21,9 +21,7 @@ package org.platformlambda.activemq.services;
 import org.platformlambda.activemq.ArtemisConnector;
 import org.platformlambda.cloud.ConnectorConfig;
 import org.platformlambda.cloud.EventProducer;
-import org.platformlambda.core.exception.AppException;
 import org.platformlambda.core.models.EventEnvelope;
-import org.platformlambda.core.models.Kv;
 import org.platformlambda.core.models.LambdaFunction;
 import org.platformlambda.core.models.PubSubProvider;
 import org.platformlambda.core.serializers.SimpleMapper;
@@ -246,7 +244,7 @@ public class PubSubManager implements PubSubProvider {
             if (subscribers.containsKey(topicPartition) || Platform.getInstance().hasRoute(topicPartition)) {
                 throw new IOException(topicPartition+" is already subscribed");
             }
-            EventConsumer consumer = new EventConsumer(domain, properties, topic, partition, parameters);
+            EventConsumer consumer = new EventConsumer(new eventConsumerDetails(domain, properties, topic, partition, parameters));
             consumer.start();
             Platform.getInstance().registerPrivate(topicPartition, listener, 1);
             subscribers.put(topicPartition, consumer);
